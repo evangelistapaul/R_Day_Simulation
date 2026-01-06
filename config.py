@@ -33,6 +33,8 @@ def dir_setup():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     print(f"Directory '{OUTPUT_DIR}' is ready.")
+    
+    return(OUTPUT_DIR_STR)
 
 # All service times now show min, mode, max; all times are in minutes
 STATION_DIC = {"RN - Smart Card Issue":{"server_ct" : 8, "service_time" : [1,2,3], "next_stn" : 1, "next_fem_stn" : 1, "USMAPS_frac" : 1, "next_USMAPS_stn" : 1, "next_USMAPS_fem_stn" : 1}, #0

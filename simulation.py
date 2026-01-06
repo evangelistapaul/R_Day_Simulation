@@ -6,40 +6,68 @@ import pandas as pd
 import os
 import sys
 import pathlib
+import argparse
 
  
 from config import (
     dir_setup, STATION_DIC
 )
 
-dir_setup()
+OUTPUT_DIR_STR = dir_setup()
 
 mod_path = 'mod'
 usmaps_path = 'rand'
 # print(sys.argv)
 
-try:
-    arguments = sys.argv
+def parse_arguments():
+    """
+    Parse command line arguments
     
-    if(sys.argv[1] == 'rand'):
-        usmaps_path = 'rand'
-    if(sys.argv[1] == 'front'):
-        usmaps_path = 'front'
-    if(sys.argv[1] == 'back'):
-        usmaps_path = 'back'
-    if(sys.argv[2] == 'mod'):
-        mod_path = 'mod'
-    if(sys.argv[2] == 'std'):
-        mod_path = 'std'
-        
-except:
-    print("exception.")
+    Returns:
+        Parsed arguments
+    """
+    parser = argparse.ArgumentParser(
+        description='R-Day Simulation - SimPy-based cadet processing simulation',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python simulation.py --usmaps rand --mod std
+  python simulation.py --usmaps front --mod mod --no-show
+  python simulation.py --usmaps back --mod std --log-level DEBUG
+        """
+    )
     
-#print("The usmaps path is: " + usmaps_path)
-#print("The mod path is: " + str(mod_path))
+    parser.add_argument(
+        '--usmaps',
+        type=str,
+        choices=['rand', 'front', 'back'],
+        default='rand',
+        help='USMAPS cadet distribution strategy (default: rand)'
+    )
+    
+    parser.add_argument(
+        '--mod',
+        type=str,
+        choices=['mod', 'std'],
+        default='std',
+        help='Modification path: modified or standard (default: std)'
+    )
+    
+    parser.add_argument(
+        '--no-show',
+        action='store_true',
+        help='Do not display plots (only save them)'
+    )
+      
+    return parser.parse_args()
 
-#os.chdir("C:\\Users\\paul.evangelista\\OneDrive - West Point\\01_CDO\\data_requests\\20250611_RDay")
-#os.chdir("/Users/paulevangelista/OneDrive - West Point/01_CDO/data_requests/20250611_RDay/")
+args = parse_arguments()
+usmaps_path = args.usmaps
+mod_path = args.mod
+
+    
+print("The usmaps path is: " + usmaps_path)
+print("The mod path is: " + str(mod_path))
 
 TOTAL_CUSTOMERS = 1250
 ARRIVAL_RATE = 2000 #customer arrivals per unit of time
@@ -223,10 +251,12 @@ df_time_stamp = pd.DataFrame(time_stamp, columns = ["entity","stn_idx","q_length
                                                     "svc_count","svc_capacity","stn_nm",
                                                     "time","next_stn","arc_ct","svc_count_after"])
 
-df_time_stamp.to_csv("df_time_stamp.csv", index=False)
+df_fname = OUTPUT_DIR_STR + "\df_time_stamp.csv"
+df_time_stamp.to_csv(df_fname, index=False)
 
 df_time_stamp_max = df_time_stamp.loc[df_time_stamp.groupby('stn_nm')['time'].idxmax()]
-df_time_stamp_max.to_csv("df_time_stamp_max.csv", index=False)    
+df_fname = OUTPUT_DIR_STR + "\df_time_stamp_max.csv"
+df_time_stamp_max.to_csv(df_fname, index=False)    
 #print(df_time_stamp_max['time'].loc[df_time_stamp_max['stn_nm'] == 'R-Day complete'].iloc[0])
 
 # 1. Find the index of the row with the maximum 'time' for each 'stn_nm'
@@ -257,11 +287,12 @@ for i in range(0,len(station_list)-1):
 
 plt.tight_layout() # Adjust subplots to fit in figure area
 
-plt_fname = mod_path + "_" + usmaps_path + ".png"
+plt_fname = OUTPUT_DIR_STR + "\\" + mod_path + "_" + usmaps_path + ".png"
 plt.savefig(plt_fname)
 plt.show()
 
-with open("recent_run.txt", "w") as file:
+recent_run_fname = OUTPUT_DIR_STR + "\\" + "recent_run.txt"
+with open(recent_run_fname, "w") as file:
     file.write(mod_path + " " + usmaps_path)
     
 
