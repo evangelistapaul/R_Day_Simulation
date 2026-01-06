@@ -251,11 +251,11 @@ df_time_stamp = pd.DataFrame(time_stamp, columns = ["entity","stn_idx","q_length
                                                     "svc_count","svc_capacity","stn_nm",
                                                     "time","next_stn","arc_ct","svc_count_after"])
 
-df_fname = OUTPUT_DIR_STR + "\df_time_stamp.csv"
+df_fname = OUTPUT_DIR_STR + "\\df_time_stamp.csv"
 df_time_stamp.to_csv(df_fname, index=False)
 
 df_time_stamp_max = df_time_stamp.loc[df_time_stamp.groupby('stn_nm')['time'].idxmax()]
-df_fname = OUTPUT_DIR_STR + "\df_time_stamp_max.csv"
+df_fname = OUTPUT_DIR_STR + "\\df_time_stamp_max.csv"
 df_time_stamp_max.to_csv(df_fname, index=False)    
 #print(df_time_stamp_max['time'].loc[df_time_stamp_max['stn_nm'] == 'R-Day complete'].iloc[0])
 
@@ -273,7 +273,7 @@ time_values = df_max_time_per_stn['time']
 time_string = ", ".join(time_values.map(str))
 
 # 4. Print the resulting string
-print(time_string)
+#print(time_string)
 
 fin_time = round(df_time_stamp['time'].iloc[df_time_stamp.shape[0]-1],2)
 
