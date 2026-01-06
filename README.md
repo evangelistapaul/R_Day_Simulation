@@ -63,7 +63,7 @@ python simulation.py
 ### Command Line Options
 
 ```bash
-python main.py --usmaps STRATEGY --mod PATH [OPTIONS]
+python simulation.py --usmaps STRATEGY --mod PATH [OPTIONS]
 
 Required Arguments:
   --usmaps {rand,front,back}  USMAPS cadet distribution strategy
@@ -86,16 +86,16 @@ Optional Arguments:
 
 ```bash
 # Standard run with random USMAPS distribution
-python main.py --usmaps rand --mod std
+python simulation.py --usmaps rand --mod std
 
 # Modified path with USMAPS cadets at the front
-python main.py --usmaps front --mod mod
+python simulation.py --usmaps front --mod mod
 
 # Run without displaying plots, with debug logging
-python main.py --usmaps back --mod std --no-show --log-level DEBUG
+python simulation.py --usmaps back --mod std --no-show --log-level DEBUG
 
 # Specify custom output directory
-python main.py --usmaps rand --mod std --output-dir ./results/run1
+python simulation.py --usmaps rand --mod std --output-dir ./results/run1
 ```
 
 ## Configuration
@@ -179,40 +179,15 @@ Edit the `service_time` array in `config.py` for any station:
 2. Update customer generation in `RDaySimulation.generate_customers()`
 3. Use attribute in routing or service time calculations
 
-## Development
-
-### Running Tests
-```bash
-# To be implemented
-pytest tests/
-```
-
-### Code Style
-The project follows PEP 8 style guidelines. Format code with:
-```bash
-black *.py
-```
-
-## Troubleshooting
-
-**Issue**: `FileNotFoundError` for base path
-- **Solution**: Update `BASE_PATH` in `config.py` to match your directory structure
-
-**Issue**: Plots not displaying
-- **Solution**: Ensure matplotlib backend is properly configured, or use `--no-show` flag
-
-**Issue**: Simulation runs slowly
-- **Solution**: Reduce `TOTAL_CUSTOMERS` in `config.py` for testing
-
 ## License
 
-[Add your license here]
+MIT License
 
 ## Contact
 
-[Add contact information]
+evangelistapaul.pe@gmail.com
 
 ## Acknowledgments
 
 - Built with [SimPy](https://simpy.readthedocs.io/) - Discrete event simulation framework
-- Developed for West Point R-Day process optimization
+- This is a simulated representation of a hypothetical R-Day for West Point in 2026. The process depicted in this simulation does not represent official policies or plans. This simulation is intended solely for academic purposes.
