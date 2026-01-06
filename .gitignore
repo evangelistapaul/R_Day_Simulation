@@ -47,8 +47,9 @@ results/
 *.png
 *.txt
 
-# Exception: keep the README
+# Exception: keep the README and requirements.txt
 !README.md
+!requirements.txt
 
 # Testing
 .pytest_cache/
