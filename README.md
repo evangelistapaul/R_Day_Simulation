@@ -22,10 +22,7 @@ rday-simulation/
 ├── requirements.txt
 ├── .gitignore
 ├── config.py              # Configuration and constants
-├── models.py              # Data models and structures
 ├── simulation.py          # Main simulation logic
-├── analysis.py            # Results analysis and visualization
-├── main.py                # Entry point
 └── output/                # Generated results (not tracked)
     ├── df_time_stamp.csv
     ├── df_time_stamp_max.csv
@@ -43,12 +40,12 @@ rday-simulation/
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd rday-simulation
+git clone https://github.com/evangelistapaul/R_Day_Simulation
+cd R_Day_Simulation
 
 # Create a virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv rday_venv
+source rday_venv/bin/activate  # On Windows: rday_venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
