@@ -57,7 +57,7 @@ pip install -r requirements.txt
 
 Run the simulation with default parameters:
 ```bash
-python main.py
+python simulation.py
 ```
 
 ### Command Line Options
