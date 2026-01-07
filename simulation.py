@@ -294,11 +294,13 @@ for i in range(0,len(station_list)-1):
 
 plt.tight_layout() # Adjust subplots to fit in figure area
 
-plt_fname = OUTPUT_DIR_STR + "\\" + mod_path + "_" + usmaps_path + ".png"
+# Join the directory and the filename safely
+filename = f"{mod_path}_{usmaps_path}.png"
+plt_fname = os.path.join(OUTPUT_DIR_STR, filename)
 plt.savefig(plt_fname)
 plt.show()
 
-recent_run_fname = OUTPUT_DIR_STR + "\\" + "recent_run.txt"
+recent_run_fname = os.path.join(OUTPUT_DIR_STR,"recent_run.txt")
 with open(recent_run_fname, "w") as file:
     file.write(mod_path + " " + usmaps_path)
     
