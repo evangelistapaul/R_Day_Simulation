@@ -10,6 +10,7 @@ import os
 import pandas as pd
 import sys
 import numpy as np
+import argparse
 
 from config import (
     dir_setup
@@ -17,6 +18,26 @@ from config import (
 
 OUTPUT_DIR_STR = dir_setup()
 os.chdir(OUTPUT_DIR_STR)
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description='parse argument for R-Day simulated minutes per frame',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python stitch_images.py --mins 6
+        """
+    )    
+    parser.add_argument(
+        '--mins',
+        type=int,
+        default=60,
+        help='R-Day minutes between each frame in 30-second video'
+    )
+    return parser.parse_args()
+
+args = parse_arguments()
+R_Day_mins_per_frame = args.mins
 
 # Color function based on fullness percentage
 def get_color(in_q):
@@ -59,7 +80,7 @@ for i in range(0,df_time_stamp.shape[0]):
         svc_ct[stn_idx] = svc_ct[stn_idx] + 1
     time_value = df_time_stamp['time'].iloc[i]
     time_diff = time_value - last_time
-    if(time_diff > 1 or i == (df_time_stamp.shape[0]-1)):
+    if(time_diff > R_Day_mins_per_frame/60 or i == (df_time_stamp.shape[0]-1)):
         #sys.exit()
         last_time = time_value
 
