@@ -59,9 +59,8 @@ Run the simulation with default parameters:
 ```bash
 python simulation.py
 ```
-### Command Line Options
 
-## Running simulation.py
+### Running simulation.py
 
 ```bash
 python simulation.py --usmaps STRATEGY --mod PATH [OPTIONS]
@@ -77,7 +76,7 @@ Required Arguments:
                               std: Use standard routing
 ```
 
-## Running build_images.py
+### Running build_images.py
 
 ```bash
 python build_images.py --mins {int}
@@ -88,7 +87,7 @@ Required Arguments:
                 All images stored in /output
 ```
 
-## Running build_images.py
+### Running build_images.py
 
 ```bash
 python stitch_images.py
@@ -104,12 +103,6 @@ python simulation.py --usmaps rand --mod std
 
 # Modified path with USMAPS cadets at the front
 python simulation.py --usmaps front --mod mod
-
-# Run without displaying plots, with debug logging
-python simulation.py --usmaps back --mod std --no-show --log-level DEBUG
-
-# Specify custom output directory
-python simulation.py --usmaps rand --mod std --output-dir ./results/run1
 ```
 
 ## Configuration
