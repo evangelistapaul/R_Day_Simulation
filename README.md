@@ -22,11 +22,12 @@ rday-simulation/
 ├── .gitignore
 ├── config.py              # Configuration and constants
 ├── simulation.py          # Main simulation logic
+├── build_images.py        # build images of the R-Day simulation
+├── stitch_images.py       # build video of the R-Day simulation
 └── output/                # Generated results (not tracked)
-    ├── df_time_stamp.csv
-    ├── df_time_stamp_max.csv
-    ├── *.png (queue plots)
-    └── simulation.log
+    ├── df_time_stamp.csv       #detailed simulation results
+    ├── *.png (queue plots, R_Day visualization plots)
+    └── *.mp4 (video of the simulation)
 ```
 
 ## Installation
@@ -58,8 +59,9 @@ Run the simulation with default parameters:
 ```bash
 python simulation.py
 ```
-
 ### Command Line Options
+
+## Running simulation.py
 
 ```bash
 python simulation.py --usmaps STRATEGY --mod PATH [OPTIONS]
@@ -73,12 +75,25 @@ Required Arguments:
   --mod {mod,std}            Routing modification
                               mod: Use modified USMAPS routing
                               std: Use standard routing
+```
 
-Optional Arguments:
-  --output-dir PATH          Output directory (default: ./output)
-  --no-show                  Don't display plots (only save)
-  --log-level LEVEL          Logging level: DEBUG, INFO, WARNING, ERROR
-  -h, --help                 Show help message
+## Running build_images.py
+
+```bash
+python build_images.py --mins {int}
+
+Required Arguments:
+  --mins {int}  Number of simulated minutes between each visualization frame
+                Default is 60 minutes  
+                All images stored in /output
+```
+
+## Running build_images.py
+
+```bash
+python stitch_images.py
+               
+               Produces mp4 of images stitched into 30 second video.
 ```
 
 ### Examples
@@ -104,7 +119,6 @@ Edit `config.py` to modify:
 - Arrival rates (`ARRIVAL_RATE`)
 - Batch sizes for bus and oath processing
 - Station definitions (servers, service times, routing)
-- File paths
 
 ### Station Configuration
 

@@ -261,9 +261,11 @@ df_time_stamp = pd.DataFrame(time_stamp, columns = ["entity","stn_idx","q_length
 df_fname = os.path.join(OUTPUT_DIR_STR, "df_time_stamp.csv")
 df_time_stamp.to_csv(df_fname, index=False)
 
-df_time_stamp_max = df_time_stamp.loc[df_time_stamp.groupby('stn_nm')['time'].idxmax()]
-df_fname = os.path.join(OUTPUT_DIR_STR, "df_time_stamp_max.csv")
-df_time_stamp_max.to_csv(df_fname, index=False)    
+# this was originally designed to provide max time that the station finished
+# mothballing...
+#df_time_stamp_max = df_time_stamp.loc[df_time_stamp.groupby('stn_nm')['time'].idxmax()]
+#df_fname = os.path.join(OUTPUT_DIR_STR, "df_time_stamp_max.csv")
+#df_time_stamp_max.to_csv(df_fname, index=False)    
 #print(df_time_stamp_max['time'].loc[df_time_stamp_max['stn_nm'] == 'R-Day complete'].iloc[0])
 
 # 1. Find the index of the row with the maximum 'time' for each 'stn_nm'
@@ -300,8 +302,10 @@ plt_fname = os.path.join(OUTPUT_DIR_STR, filename)
 plt.savefig(plt_fname)
 plt.show()
 
-recent_run_fname = os.path.join(OUTPUT_DIR_STR,"recent_run.txt")
-with open(recent_run_fname, "w") as file:
-    file.write(mod_path + " " + usmaps_path)
+# mothballing
+# this was a control file for analysis
+#recent_run_fname = os.path.join(OUTPUT_DIR_STR,"recent_run.txt")
+#with open(recent_run_fname, "w") as file:
+#    file.write(mod_path + " " + usmaps_path)
     
 
