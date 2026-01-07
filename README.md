@@ -126,7 +126,6 @@ The simulation generates several output files in the specified output directory:
 - **station_max_times.txt**: Comma-separated list of max times
 - **[mod]_[usmaps].png**: Queue length visualization plots
 - **recent_run.txt**: Configuration of the most recent run
-- **simulation.log**: Detailed execution log
 
 ## Key Features
 
