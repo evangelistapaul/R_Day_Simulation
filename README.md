@@ -7,7 +7,6 @@ A discrete-event simulation built with SimPy to model the West Point R-Day (Rece
 This simulation models the flow of new cadets through various processing stations on R-Day, including:
 - Smart card issuance
 - Medical screening
-- Immunizations
 - Uniform issue
 - Administrative processing
 - And more...
