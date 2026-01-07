@@ -232,7 +232,14 @@ df_time_stamp['station'] = [item[5] for item in time_stamp]
 df_time_stamp['time_stamp'] = [item[6] for item in time_stamp]
 df_time_stamp['hr'] = df_time_stamp['time_stamp'].astype(int) + 6
 
-df_time_stamp_sum = pd.DataFrame(df_time_stamp[["stn_no","station","hr"]].groupby(["stn_no","station"]).value_counts()).reset_index()
+#df_time_stamp_sum = pd.DataFrame(df_time_stamp[["stn_no","station","hr"]].groupby(["stn_no","station"]).value_counts()).reset_index()
+df_time_stamp_sum = (
+    df_time_stamp[["stn_no", "station", "hr"]]
+    .groupby(["stn_no", "station"])
+    .value_counts()
+    .reset_index(name="count")  # <--- This ensures the column is named 'count'
+)
+
 df_time_stamp_wide = df_time_stamp_sum.pivot(index = ["stn_no","station"], columns = "hr", values = "count" ).reset_index()
 
 def plot_queue(idx):
