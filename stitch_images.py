@@ -66,4 +66,6 @@ with open("recent_run.txt", "r") as file:
     path_descr = file.read()
     
 output_file = 'stitched_video_' + path_descr.replace(" ","_") + ".mp4"
-pngs_to_video_opencv(image_folder_path, output_file, fps=fps_rate)
+#pngs_to_video_opencv(image_folder_path, output_file, fps=fps_rate)
+output_path = os.path.join(image_folder_path, output_file)
+pngs_to_video_opencv(image_folder_path, output_path, fps=fps_rate)
