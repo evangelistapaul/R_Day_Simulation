@@ -20,16 +20,17 @@ rday-simulation/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
-├── config.py              # Configuration and constants
-├── simulation.py          # Main simulation logic - refactored by claude.ai
-├── simulation_orig.py     # Original simulation logic, before refactoring by claude.ai
-├── build_images.py        # build images of the R-Day simulation
-├── stitch_images.py       # build video of the R-Day simulation
-└── output/                # Generated results (not tracked)
-    ├── df_time_stamp.csv       #detailed simulation results
-    ├── recent_run.txt     # control file that stores args of recent run
-    ├── *.png (queue plots, R_Day visualization plots)
-    └── *.mp4 (video of the simulation)
+├── config.py                             # configuration and constants
+├── simulation.py                         # main simulation logic - refactored by claude.ai
+├── simulation_orig.py                    # original simulation logic, before refactoring by claude.ai
+├── simulation_example_notebook.ipynb     # original simulation logic, before refactoring by claude.ai
+├── build_images.py                       # build images of the R-Day simulation
+├── stitch_images.py                      # build video of the R-Day simulation
+└── output/                               # generated results (not tracked)
+    ├── df_time_stamp.csv                 # detailed simulation results
+    ├── recent_run.txt                    # control file that stores args of recent run
+    ├── *.png                             # queue plots, R_Day visualization plots
+    └── *.mp4                             # video of the simulation
 ```
 
 ## Installation
