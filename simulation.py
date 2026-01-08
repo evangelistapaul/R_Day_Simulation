@@ -1,11 +1,8 @@
 import simpy
 from scipy import stats
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import os
-import sys
-import pathlib
 import argparse
 
  
@@ -213,16 +210,8 @@ for stn_nm in station_list:
     q_list.append([])
     q_list_time.append([])
 
-
-#barber = simpy.Resource(env, 14) #barber resource with capacity of 1
-#tailor = simpy.Resource(env, 6) #tailors
-#WB4 = simpy.Resource(env, 12) # WB4 tailors; esimate 12 based on 230 cdts per hour, 3 min service time
 env.process(generate_cust(env))#, tailor)) #set the initial simulation process
 env.run() #run the simulation
-
-# time_stamp_a = [i,stn_idx,len(resource_list[stn_idx].queue),
-#                           resource_list[stn_idx].count,resource_list[stn_idx].capacity,
-#                           stn,fin_time]
 
 df_time_stamp = pd.DataFrame()
 df_time_stamp['o_time_stamp'] = time_stamp
@@ -251,9 +240,7 @@ def plot_queue(idx):
     plt.xlim(5,20)
     plt.show()
     
-#for i in range(0,len(station_list)):
-#    plot_queue(i)
-    
+  
 df_time_stamp = pd.DataFrame(time_stamp, columns = ["entity","stn_idx","q_length",
                                                     "svc_count","svc_capacity","stn_nm",
                                                     "time","next_stn","arc_ct","svc_count_after"])
