@@ -302,10 +302,9 @@ plt_fname = os.path.join(OUTPUT_DIR_STR, filename)
 plt.savefig(plt_fname)
 plt.show()
 
-# mothballing
-# this was a control file for analysis
-#recent_run_fname = os.path.join(OUTPUT_DIR_STR,"recent_run.txt")
-#with open(recent_run_fname, "w") as file:
-#    file.write(mod_path + " " + usmaps_path)
+# this is a control file for analysis and plotting
+recent_run_fname = os.path.join(OUTPUT_DIR_STR,"recent_run.txt")
+with open(recent_run_fname, "w") as file:
+    file.write(mod_path + " " + usmaps_path)
     
 

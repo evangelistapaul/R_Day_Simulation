@@ -26,6 +26,7 @@ rday-simulation/
 ├── stitch_images.py       # build video of the R-Day simulation
 └── output/                # Generated results (not tracked)
     ├── df_time_stamp.csv       #detailed simulation results
+    ├── recent_run.txt     # control file that stores args of recent run
     ├── *.png (queue plots, R_Day visualization plots)
     └── *.mp4 (video of the simulation)
 ```
