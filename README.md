@@ -198,4 +198,5 @@ evangelistapaul.pe@gmail.com
 ## Acknowledgments
 
 - Built with [SimPy](https://simpy.readthedocs.io/) - Discrete event simulation framework
+- This was an incredible learning journey with claude.ai and gemini.google.com
 - This is a simulated representation of a hypothetical R-Day for West Point in 2026. The process depicted in this simulation does not represent official policies or plans. This simulation is intended solely for academic purposes.
