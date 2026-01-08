@@ -7,14 +7,13 @@ import argparse
 
  
 from config import (
-    dir_setup, STATION_DIC
+    dir_setup, STATION_DIC, TOTAL_CUSTOMERS, ARRIVAL_RATE,
+    SIMULATION_START_TIME, BUS_BATCH_SIZE, OATH_BATCH_SIZE,
+    USMAPS_COUNT_MAX, USMAPS_PROBABILITY, FEMALE_COUNT_MAX,
+    CUSTOMER_BATCH_SIZE
 )
 
 OUTPUT_DIR_STR = dir_setup()
-
-mod_path = 'mod'
-usmaps_path = 'rand'
-# print(sys.argv)
 
 def parse_arguments():
     """
@@ -66,8 +65,8 @@ mod_path = args.mod
 print("The usmaps path is: " + usmaps_path)
 print("The mod path is: " + str(mod_path))
 
-TOTAL_CUSTOMERS = 1250
-ARRIVAL_RATE = 2000 #customer arrivals per unit of time
+#TOTAL_CUSTOMERS = 1250
+#ARRIVAL_RATE = 2000 #customer arrivals per unit of time
 
 time_stamp = []
 arc_dic = {}
@@ -75,6 +74,7 @@ arc_dic = {}
 def generic_stn(env, i, stn):
     stn_idx = station_idx_dic[stn]
     svc_time_mode = STATION_DIC[stn]["service_time"]
+    # divide by 60 converts all minutes to hours
     s_loc = svc_time_mode[0]/60
     s_scale = svc_time_mode[2]/60 - s_loc
     if(s_scale == 0):
@@ -97,7 +97,7 @@ def generic_stn(env, i, stn):
                            resource_list[stn_idx].count,resource_list[stn_idx].capacity,
                            stn,fin_time]
         q_list[stn_idx].append(len(resource_list[stn_idx].queue))
-        q_list_time[stn_idx].append(env.now[0] + 6)
+        q_list_time[stn_idx].append(env.now[0] + SIMULATION_START_TIME )
         yield env.timeout(svc_time_rand)
     if(sex_dic[i] == 1):
         next_stn = STATION_DIC[stn]["next_stn"]
@@ -129,7 +129,9 @@ batch_bus_q = []
 def batch_bus(env, i):
     global batch_bus_q
     batch_bus_q.append(i)
-    if (len(batch_bus_q) > 40 or (arc_dic.get("2,3") == TOTAL_CUSTOMERS - 1)):
+    arc_dic_key = str(station_idx_dic["Ike 2 Scan-Out"]) + "," + str(station_idx_dic["Bus Movement"])
+    arc_ct_Ike_to_bus = arc_dic.get(arc_dic_key)
+    if (len(batch_bus_q) > BUS_BATCH_SIZE or (arc_ct_Ike_to_bus == TOTAL_CUSTOMERS - 1)):
         for cdt in batch_bus_q:
             next_stn = station_idx_dic["Bus Movement"]
             env.process(generic_stn(env, cdt, station_list[next_stn]))
@@ -139,14 +141,19 @@ batch_oath_q = []
 def batch_oath(env, i):
     global batch_oath_q
     batch_oath_q.append(i)
+    arc_dic_key = str(station_idx_dic["LRC Issue Point 6 687"]) + \
+        "," + str(station_idx_dic["TH 6 Oath"])
+    arc_ct_LRC6_to_Oath = arc_dic.get(arc_dic_key)
+    arc_dic_key = str(station_idx_dic["TH 5 Med Screening 1"]) + \
+        "," + str(station_idx_dic["TH 6 Oath"])
+    arc_ct_Med_to_Oath = arc_dic.get(arc_dic_key)
     try:
-        arc_12_7 = arc_dic.get("12,7")
-        if(arc_dic.get("12,7") is None):
-            arc_12_7 = 0
-        arc_sum = arc_dic.get("6,7") + arc_12_7
+        if(arc_ct_LRC6_to_Oath is None):
+            arc_ct_LRC6_to_Oath = 0
+        arc_sum = arc_ct_Med_to_Oath + arc_ct_LRC6_to_Oath
     except:
         arc_sum = 0
-    if (len(batch_oath_q) > 20 or (arc_sum == TOTAL_CUSTOMERS - 1)):
+    if (len(batch_oath_q) > OATH_BATCH_SIZE or (arc_sum == TOTAL_CUSTOMERS - 1)):
         for cdt in batch_oath_q:
             next_stn = station_idx_dic["TH 6 Oath"]
             env.process(generic_stn(env, cdt, station_list[next_stn]))
@@ -163,19 +170,19 @@ def generate_cust(env):#, tailor):
         usmaps_rand = stats.uniform.rvs()
         usmaps_go = 0
         if(usmaps_path == 'rand'):
-            if(usmaps_rand < 0.25 and usmaps_ct < 200):
+            if(usmaps_rand < USMAPS_PROBABILITY and usmaps_ct < USMAPS_COUNT_MAX):
                 usmaps_go = 1
         if(usmaps_path == 'front'):
-            if(i < 200):
+            if(i < USMAPS_COUNT_MAX):
                 usmaps_go = 1
         if(usmaps_path == 'back'):
-            if(i >= (TOTAL_CUSTOMERS - 200)):
+            if(i >= (TOTAL_CUSTOMERS - USMAPS_COUNT_MAX)):
                 usmaps_go = 1    
         if(usmaps_go == 1):
             usmaps_dic[i] = 1 #USMAPS cadet
             usmaps_ct = usmaps_ct + 1
         sex_dic[i] = 1
-        if(i % 2 == 0 and fem_ct < 53):
+        if(i % 2 == 0 and fem_ct < FEMALE_COUNT_MAX):
             sex_dic[i] = 0 #female cadet
             fem_ct = fem_ct + 1
         #print('generating customer %s' % i)
@@ -184,7 +191,7 @@ def generate_cust(env):#, tailor):
         #inter_arr_time = np.array([1/ARRIVAL_RATE]) #static for testing
         env.process(generic_stn(env, i, station_list[0]))
         ct = ct + 1
-        if(ct == 250):
+        if(ct == CUSTOMER_BATCH_SIZE):
             discount_time = env.now[0] - start_time
             if((1 - discount_time) > 0):
                 yield env.timeout(1 - discount_time)
@@ -219,7 +226,7 @@ df_time_stamp['pn_id'] = [item[0] for item in time_stamp]
 df_time_stamp['stn_no'] = [item[1] for item in time_stamp]
 df_time_stamp['station'] = [item[5] for item in time_stamp]
 df_time_stamp['time_stamp'] = [item[6] for item in time_stamp]
-df_time_stamp['hr'] = df_time_stamp['time_stamp'].astype(int) + 6
+df_time_stamp['hr'] = df_time_stamp['time_stamp'].astype(int) + SIMULATION_START_TIME
 
 #df_time_stamp_sum = pd.DataFrame(df_time_stamp[["stn_no","station","hr"]].groupby(["stn_no","station"]).value_counts()).reset_index()
 df_time_stamp_sum = (

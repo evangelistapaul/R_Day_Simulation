@@ -278,6 +278,6 @@ for i in range(0,df_time_stamp.shape[0]):
         plt.savefig(fname, dpi=300, bbox_inches='tight')
         #fig.set_size_inches(16, 12)
         #plt.savefig(fname, dpi=300)
-        plt.show()
+        #plt.show()
         
         
