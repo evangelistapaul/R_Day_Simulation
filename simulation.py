@@ -170,7 +170,7 @@ class RDaySimulation:
         
         # Track queue lengths over time
         self.q_list[station_idx].append(len(resource.queue))
-        self.q_list_time[station_idx].append(self.env.now[0] + SIMULATION_START_TIME)
+        self.q_list_time[station_idx].append(self.env.now + SIMULATION_START_TIME)
     
     def generic_stn(self, cadet_id: int, station: str):
         """
@@ -186,7 +186,7 @@ class RDaySimulation:
         # Request resource and process
         with self.resource_list[station_idx].request() as req:
             yield req
-            finish_time = self.env.now[0] + service_time
+            finish_time = self.env.now + service_time
             next_stn_idx = self.determine_next_station(station, cadet_id)
             self.record_station_visit(cadet_id, station, finish_time, next_stn_idx)
             yield self.env.timeout(service_time)
@@ -300,11 +300,11 @@ class RDaySimulation:
             
             # Batch timing control
             if count == CUSTOMER_BATCH_SIZE:
-                discount_time = self.env.now[0] - start_time
+                discount_time = self.env.now - start_time
                 if (1 - discount_time) > 0:
                     yield self.env.timeout(1 - discount_time)
                 count = 0
-                start_time = self.env.now[0]
+                start_time = self.env.now
                 female_count = 0
     
     def _is_usmaps_cadet(self, cadet_id: int, usmaps_count: int) -> bool:
