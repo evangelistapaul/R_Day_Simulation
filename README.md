@@ -21,7 +21,8 @@ rday-simulation/
 ├── requirements.txt
 ├── .gitignore
 ├── config.py              # Configuration and constants
-├── simulation.py          # Main simulation logic
+├── simulation.py          # Main simulation logic - refactored by claude.ai
+├── simulation_orig.py     # Original simulation logic, before refactoring by claude.ai
 ├── build_images.py        # build images of the R-Day simulation
 ├── stitch_images.py       # build video of the R-Day simulation
 └── output/                # Generated results (not tracked)
