@@ -1,11 +1,16 @@
+"""
+Refactored R-Day Simulation with class-based structure
+This eliminates global variables and improves code organization
+"""
+
 import simpy
 from scipy import stats
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import argparse
+from typing import Dict, List, Tuple
 
- 
 from config import (
     dir_setup, STATION_DIC, TOTAL_CUSTOMERS, ARRIVAL_RATE,
     SIMULATION_START_TIME, BUS_BATCH_SIZE, OATH_BATCH_SIZE,
@@ -13,11 +18,386 @@ from config import (
     CUSTOMER_BATCH_SIZE
 )
 
-OUTPUT_DIR_STR = dir_setup()
+
+class RDaySimulation:
+    """
+    Discrete event simulation for West Point R-Day cadet processing.
+    
+    Attributes:
+        env: SimPy environment for discrete event simulation
+        mod_path: Modification path ('mod' or 'std')
+        usmaps_path: USMAPS distribution strategy ('rand', 'front', or 'back')
+        output_dir: Directory for output files
+    """
+    
+    def __init__(self, mod_path: str = 'std', usmaps_path: str = 'rand', 
+                 output_dir: str = None):
+        """
+        Initialize the R-Day simulation.
+        
+        Args:
+            mod_path: Modification path ('mod' or 'std')
+            usmaps_path: USMAPS distribution strategy ('rand', 'front', 'back')
+            output_dir: Output directory path
+        """
+        self.mod_path = mod_path
+        self.usmaps_path = usmaps_path
+        self.output_dir = output_dir or dir_setup()
+        
+        # Initialize SimPy environment
+        self.env = simpy.Environment()
+        
+        # Station configuration
+        self.station_list = list(STATION_DIC.keys())
+        self.station_idx_dic = dict(zip(self.station_list, 
+                                       range(len(self.station_list))))
+        
+        # Resources (servers at each station)
+        self.resource_list = []
+        for station_name in self.station_list:
+            server_count = STATION_DIC[station_name]["server_ct"]
+            self.resource_list.append(simpy.Resource(self.env, server_count))
+        
+        # Tracking data structures
+        self.time_stamp = []
+        self.arc_dic = {}
+        self.q_list = [[] for _ in self.station_list]
+        self.q_list_time = [[] for _ in self.station_list]
+        self.sex_dic = {}
+        self.usmaps_dic = {}
+        
+        # Batch queues
+        self.batch_bus_q = []
+        self.batch_oath_q = []
+    
+    def calculate_service_time(self, station: str, cadet_id: int) -> float:
+        """
+        Calculate service time using triangular distribution.
+        
+        Args:
+            station: Station name
+            cadet_id: Cadet identifier
+            
+        Returns:
+            Service time in hours
+        """
+        service_time_params = STATION_DIC[station]["service_time"]
+        
+        # Convert minutes to hours
+        min_time = service_time_params[0] / 60
+        mode_time = service_time_params[1] / 60
+        max_time = service_time_params[2] / 60
+        
+        # Calculate triangular distribution parameters
+        scale = max_time - min_time
+        if scale == 0:
+            c_param = 0
+        else:
+            c_param = (mode_time - min_time) / scale
+        
+        # Generate random service time
+        service_time = stats.triang.rvs(c=c_param, loc=min_time, 
+                                       scale=scale, size=1)[0]
+        
+        # Apply USMAPS adjustment if applicable
+        if self.usmaps_dic[cadet_id] == 1:
+            service_time *= STATION_DIC[station]["USMAPS_frac"]
+        
+        # Female cadets skip barber shop
+        if self.sex_dic[cadet_id] == 0 and station == "CA 2 Barber Shop":
+            service_time = 0
+        
+        return service_time
+    
+    def determine_next_station(self, station: str, cadet_id: int) -> int:
+        """
+        Determine the next station based on cadet characteristics.
+        
+        Args:
+            station: Current station name
+            cadet_id: Cadet identifier
+            
+        Returns:
+            Index of next station
+        """
+        is_male = self.sex_dic[cadet_id] == 1
+        is_usmaps = self.usmaps_dic[cadet_id] == 1
+        is_modified_path = self.mod_path == 'mod'
+        
+        if is_male:
+            if is_usmaps and is_modified_path:
+                return STATION_DIC[station]["next_USMAPS_stn"]
+            else:
+                return STATION_DIC[station]["next_stn"]
+        else:  # Female
+            if is_usmaps and is_modified_path:
+                return STATION_DIC[station]["next_USMAPS_fem_stn"]
+            else:
+                return STATION_DIC[station]["next_fem_stn"]
+    
+    def record_station_visit(self, cadet_id: int, station: str, 
+                            finish_time: float, next_stn_idx: int):
+        """
+        Record data about a cadet's visit to a station.
+        
+        Args:
+            cadet_id: Cadet identifier
+            station: Station name
+            finish_time: Time when service completes
+            next_stn_idx: Index of next station
+        """
+        station_idx = self.station_idx_dic[station]
+        resource = self.resource_list[station_idx]
+        
+        # Track arc (flow between stations)
+        arc_key = f"{station_idx},{next_stn_idx}"
+        self.arc_dic[arc_key] = self.arc_dic.get(arc_key, 0) + 1
+        
+        # Record timestamp data
+        timestamp_record = [
+            cadet_id,
+            station_idx,
+            len(resource.queue),
+            resource.count,
+            resource.capacity,
+            station,
+            finish_time,
+            next_stn_idx,
+            self.arc_dic[arc_key],
+            resource.count
+        ]
+        self.time_stamp.append(timestamp_record)
+        
+        # Track queue lengths over time
+        self.q_list[station_idx].append(len(resource.queue))
+        self.q_list_time[station_idx].append(self.env.now[0] + SIMULATION_START_TIME)
+    
+    def generic_stn(self, cadet_id: int, station: str):
+        """
+        Process a cadet through a station.
+        
+        Args:
+            cadet_id: Cadet identifier
+            station: Station name
+        """
+        station_idx = self.station_idx_dic[station]
+        service_time = self.calculate_service_time(station, cadet_id)
+        
+        # Request resource and process
+        with self.resource_list[station_idx].request() as req:
+            yield req
+            finish_time = self.env.now[0] + service_time
+            next_stn_idx = self.determine_next_station(station, cadet_id)
+            self.record_station_visit(cadet_id, station, finish_time, next_stn_idx)
+            yield self.env.timeout(service_time)
+        
+        # Route to next station
+        if next_stn_idx > 0:
+            self.route_to_next_station(cadet_id, next_stn_idx)
+    
+    def route_to_next_station(self, cadet_id: int, next_stn_idx: int):
+        """
+        Route cadet to the next station, handling batching if needed.
+        
+        Args:
+            cadet_id: Cadet identifier
+            next_stn_idx: Index of next station
+        """
+        if next_stn_idx == self.station_idx_dic["Bus Movement"]:
+            self.batch_bus(cadet_id)
+        elif next_stn_idx == self.station_idx_dic["TH 6 Oath"]:
+            self.batch_oath(cadet_id)
+        else:
+            next_station = self.station_list[next_stn_idx]
+            self.env.process(self.generic_stn(cadet_id, next_station))
+    
+    def batch_bus(self, cadet_id: int):
+        """
+        Batch cadets for bus movement to manage transportation efficiently.
+        
+        Args:
+            cadet_id: Cadet identifier
+        """
+        self.batch_bus_q.append(cadet_id)
+        
+        # Check if batch is ready to process
+        ike_idx = self.station_idx_dic["Ike 2 Scan-Out"]
+        bus_idx = self.station_idx_dic["Bus Movement"]
+        arc_key = f"{ike_idx},{bus_idx}"
+        arc_count = self.arc_dic.get(arc_key, 0)
+        
+        batch_ready = (len(self.batch_bus_q) > BUS_BATCH_SIZE or 
+                      arc_count == TOTAL_CUSTOMERS - 1)
+        
+        if batch_ready:
+            for cdt in self.batch_bus_q:
+                self.env.process(self.generic_stn(cdt, "Bus Movement"))
+            self.batch_bus_q = []
+    
+    def batch_oath(self, cadet_id: int):
+        """
+        Batch cadets for oath ceremony.
+        
+        Args:
+            cadet_id: Cadet identifier
+        """
+        self.batch_oath_q.append(cadet_id)
+        
+        # Calculate total cadets who have reached oath point
+        lrc_idx = self.station_idx_dic["LRC Issue Point 6 687"]
+        med_idx = self.station_idx_dic["TH 5 Med Screening 1"]
+        oath_idx = self.station_idx_dic["TH 6 Oath"]
+        
+        arc_lrc_key = f"{lrc_idx},{oath_idx}"
+        arc_med_key = f"{med_idx},{oath_idx}"
+        
+        try:
+            arc_lrc_count = self.arc_dic.get(arc_lrc_key, 0)
+            arc_med_count = self.arc_dic.get(arc_med_key, 0)
+            arc_sum = arc_lrc_count + arc_med_count
+        except:
+            arc_sum = 0
+        
+        batch_ready = (len(self.batch_oath_q) > OATH_BATCH_SIZE or 
+                      arc_sum == TOTAL_CUSTOMERS - 1)
+        
+        if batch_ready:
+            for cdt in self.batch_oath_q:
+                self.env.process(self.generic_stn(cdt, "TH 6 Oath"))
+            self.batch_oath_q = []
+    
+    def generate_cadets(self):
+        """
+        Generate cadet arrivals over time.
+        """
+        count = 0
+        start_time = 0
+        female_count = 0
+        usmaps_count = 0
+        
+        for cadet_id in range(1, TOTAL_CUSTOMERS):
+            # Determine if cadet is USMAPS
+            self.usmaps_dic[cadet_id] = 0
+            if self._is_usmaps_cadet(cadet_id, usmaps_count):
+                self.usmaps_dic[cadet_id] = 1
+                usmaps_count += 1
+            
+            # Determine cadet gender (1=male, 0=female)
+            self.sex_dic[cadet_id] = 1
+            if cadet_id % 2 == 0 and female_count < FEMALE_COUNT_MAX:
+                self.sex_dic[cadet_id] = 0
+                female_count += 1
+            
+            # Generate inter-arrival time
+            inter_arrival_time = stats.expon.rvs(loc=0, scale=(1/ARRIVAL_RATE), 
+                                                 size=1)[0]
+            yield self.env.timeout(inter_arrival_time)
+            
+            # Start cadet through first station
+            self.env.process(self.generic_stn(cadet_id, self.station_list[0]))
+            
+            count += 1
+            
+            # Batch timing control
+            if count == CUSTOMER_BATCH_SIZE:
+                discount_time = self.env.now[0] - start_time
+                if (1 - discount_time) > 0:
+                    yield self.env.timeout(1 - discount_time)
+                count = 0
+                start_time = self.env.now[0]
+                female_count = 0
+    
+    def _is_usmaps_cadet(self, cadet_id: int, usmaps_count: int) -> bool:
+        """
+        Determine if a cadet is USMAPS based on distribution strategy.
+        
+        Args:
+            cadet_id: Cadet identifier
+            usmaps_count: Current count of USMAPS cadets
+            
+        Returns:
+            True if cadet is USMAPS
+        """
+        if usmaps_count >= USMAPS_COUNT_MAX:
+            return False
+        
+        if self.usmaps_path == 'rand':
+            return stats.uniform.rvs() < USMAPS_PROBABILITY
+        elif self.usmaps_path == 'front':
+            return cadet_id < USMAPS_COUNT_MAX
+        elif self.usmaps_path == 'back':
+            return cadet_id >= (TOTAL_CUSTOMERS - USMAPS_COUNT_MAX)
+        
+        return False
+    
+    def run(self):
+        """
+        Execute the simulation.
+        """
+        print(f"Starting simulation with USMAPS path: {self.usmaps_path}, "
+              f"mod path: {self.mod_path}")
+        
+        self.env.process(self.generate_cadets())
+        self.env.run()
+        
+        print("Simulation complete")
+    
+    def save_results(self):
+        """
+        Save simulation results to CSV files.
+        """
+        df = pd.DataFrame(self.time_stamp, columns=[
+            "entity", "stn_idx", "q_length", "svc_count", "svc_capacity",
+            "stn_nm", "time", "next_stn", "arc_ct", "svc_count_after"
+        ])
+        
+        output_file = os.path.join(self.output_dir, "df_time_stamp.csv")
+        df.to_csv(output_file, index=False)
+        print(f"Results saved to {output_file}")
+        
+        return df
+    
+    def plot_results(self, show_plots: bool = True):
+        """
+        Generate and save visualization of queue lengths.
+        
+        Args:
+            show_plots: Whether to display plots interactively
+        """
+        df = pd.DataFrame(self.time_stamp, columns=[
+            "entity", "stn_idx", "q_length", "svc_count", "svc_capacity",
+            "stn_nm", "time", "next_stn", "arc_ct", "svc_count_after"
+        ])
+        
+        final_time = round(df['time'].iloc[-1], 2)
+        
+        fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(15, 12))
+        fig.suptitle(f"{self.mod_path} {self.usmaps_path} | {final_time}", 
+                    fontsize=24)
+        
+        for i in range(len(self.station_list) - 1):
+            row = i // 4
+            col = i % 4
+            ax[row, col].scatter(self.q_list_time[i], self.q_list[i])
+            ax[row, col].set_title(self.station_list[i])
+        
+        plt.tight_layout()
+        
+        filename = f"{self.mod_path}_{self.usmaps_path}.png"
+        output_file = os.path.join(self.output_dir, filename)
+        plt.savefig(output_file)
+        
+        if show_plots:
+            plt.show()
+        else:
+            plt.close()
+        
+        print(f"Plot saved to {output_file}")
+
 
 def parse_arguments():
     """
-    Parse command line arguments
+    Parse command line arguments.
     
     Returns:
         Parsed arguments
@@ -29,7 +409,6 @@ def parse_arguments():
 Examples:
   python simulation.py --usmaps rand --mod std
   python simulation.py --usmaps front --mod mod --no-show
-  python simulation.py --usmaps back --mod std --log-level DEBUG
         """
     )
     
@@ -54,238 +433,27 @@ Examples:
         action='store_true',
         help='Do not display plots (only save them)'
     )
-      
+    
     return parser.parse_args()
 
-args = parse_arguments()
-usmaps_path = args.usmaps
-mod_path = args.mod
 
+def main():
+    """Main execution function."""
+    args = parse_arguments()
     
-print("The usmaps path is: " + usmaps_path)
-print("The mod path is: " + str(mod_path))
-
-time_stamp = []
-arc_dic = {}
-
-def generic_stn(env, i, stn):
-    stn_idx = station_idx_dic[stn]
-    svc_time_mode = STATION_DIC[stn]["service_time"]
-    # divide by 60 converts all minutes to hours
-    s_loc = svc_time_mode[0]/60
-    s_scale = svc_time_mode[2]/60 - s_loc
-    if(s_scale == 0):
-        s_c = 0
-    else:
-        s_c = (svc_time_mode[1]/60 - s_loc)/s_scale
-    svc_time_rand = stats.triang.rvs(c = s_c,
-                                     loc = s_loc,
-                                     scale = s_scale,
-                                     size = 1)
-    if(usmaps_dic[i] == 1):
-        svc_time_rand = svc_time_rand * STATION_DIC[stn]["USMAPS_frac"]
-    if(sex_dic[i] == 0 and stn == "CA 2 Barber Shop" ): # female NC barber time = 0
-        svc_time_rand = svc_time_rand * 0
-    with resource_list[stn_idx].request() as req:
-        yield req
-        fin_time = env.now[0] + svc_time_rand[0]
-        time_stamp_a = [i,stn_idx,len(resource_list[stn_idx].queue),
-                           resource_list[stn_idx].count,resource_list[stn_idx].capacity,
-                           stn,fin_time]
-        q_list[stn_idx].append(len(resource_list[stn_idx].queue))
-        q_list_time[stn_idx].append(env.now[0] + SIMULATION_START_TIME )
-        yield env.timeout(svc_time_rand)
-    if(sex_dic[i] == 1):
-        next_stn = STATION_DIC[stn]["next_stn"]
-        if(usmaps_dic[i] == 1 and mod_path == 'mod'):
-            next_stn = STATION_DIC[stn]["next_USMAPS_stn"]
-    if(sex_dic[i] == 0):
-        next_stn = STATION_DIC[stn]["next_fem_stn"]
-        if(usmaps_dic[i] == 1 and mod_path == 'mod'):
-            next_stn = STATION_DIC[stn]["next_USMAPS_fem_stn"]
-    time_stamp_a.append(next_stn)
-    arc_dic_key = str(stn_idx) + "," + str(next_stn)
-    if(arc_dic.get(arc_dic_key) == None):
-        arc_dic[arc_dic_key] = 1
-    else:
-        arc_dic[arc_dic_key] = arc_dic[arc_dic_key] + 1
-    time_stamp_a.append(arc_dic[arc_dic_key])
-    time_stamp_a.append(resource_list[stn_idx].count)
-    time_stamp.append(time_stamp_a)
-    if next_stn > 0:
-        if station_idx_dic["Bus Movement"] == next_stn:
-            batch_bus(env, i)
-        elif station_idx_dic["TH 6 Oath"] == next_stn:
-            batch_oath(env, i)
-        else:
-            env.process(generic_stn(env, i, station_list[next_stn]))
-
-batch_bus_q = []
-def batch_bus(env, i):
-    global batch_bus_q
-    batch_bus_q.append(i)
-    arc_dic_key = str(station_idx_dic["Ike 2 Scan-Out"]) + "," + str(station_idx_dic["Bus Movement"])
-    arc_ct_Ike_to_bus = arc_dic.get(arc_dic_key)
-    if (len(batch_bus_q) > BUS_BATCH_SIZE or (arc_ct_Ike_to_bus == TOTAL_CUSTOMERS - 1)):
-        for cdt in batch_bus_q:
-            next_stn = station_idx_dic["Bus Movement"]
-            env.process(generic_stn(env, cdt, station_list[next_stn]))
-        batch_bus_q = []
-
-batch_oath_q = []
-def batch_oath(env, i):
-    global batch_oath_q
-    batch_oath_q.append(i)
-    arc_dic_key = str(station_idx_dic["LRC Issue Point 6 687"]) + \
-        "," + str(station_idx_dic["TH 6 Oath"])
-    arc_ct_LRC6_to_Oath = arc_dic.get(arc_dic_key)
-    arc_dic_key = str(station_idx_dic["TH 5 Med Screening 1"]) + \
-        "," + str(station_idx_dic["TH 6 Oath"])
-    arc_ct_Med_to_Oath = arc_dic.get(arc_dic_key)
-    try:
-        if(arc_ct_LRC6_to_Oath is None):
-            arc_ct_LRC6_to_Oath = 0
-        arc_sum = arc_ct_Med_to_Oath + arc_ct_LRC6_to_Oath
-    except:
-        arc_sum = 0
-    if (len(batch_oath_q) > OATH_BATCH_SIZE or (arc_sum == TOTAL_CUSTOMERS - 1)):
-        for cdt in batch_oath_q:
-            next_stn = station_idx_dic["TH 6 Oath"]
-            env.process(generic_stn(env, cdt, station_list[next_stn]))
-        batch_oath_q = []
-
-def generate_cust(env):
-    #generate the customers - this is essentially an arrival generator
-    ct = 0
-    start_time = 0
-    fem_ct = 0
-    usmaps_ct = 0
-    for i in range(1,TOTAL_CUSTOMERS):
-        usmaps_dic[i] = 0
-        usmaps_rand = stats.uniform.rvs()
-        usmaps_go = 0
-        if(usmaps_path == 'rand'):
-            if(usmaps_rand < USMAPS_PROBABILITY and usmaps_ct < USMAPS_COUNT_MAX):
-                usmaps_go = 1
-        if(usmaps_path == 'front'):
-            if(i < USMAPS_COUNT_MAX):
-                usmaps_go = 1
-        if(usmaps_path == 'back'):
-            if(i >= (TOTAL_CUSTOMERS - USMAPS_COUNT_MAX)):
-                usmaps_go = 1    
-        if(usmaps_go == 1):
-            usmaps_dic[i] = 1 #USMAPS cadet
-            usmaps_ct = usmaps_ct + 1
-        sex_dic[i] = 1
-        if(i % 2 == 0 and fem_ct < FEMALE_COUNT_MAX):
-            sex_dic[i] = 0 #female cadet
-            fem_ct = fem_ct + 1
-        inter_arr_time = stats.expon.rvs(loc=0,scale=(1/ARRIVAL_RATE),size=1) #location is offset, scale is mean
-        yield env.timeout(inter_arr_time)
-        env.process(generic_stn(env, i, station_list[0]))
-        ct = ct + 1
-        if(ct == CUSTOMER_BATCH_SIZE):
-            discount_time = env.now[0] - start_time
-            if((1 - discount_time) > 0):
-                yield env.timeout(1 - discount_time)
-            ct = 0
-            start_time = env.now[0]
-            fem_ct = 0
-
-
-
-station_list = list(STATION_DIC.keys())
-
-station_idx_dic = dict(zip(station_list,range(0,len(station_list))))
-
-resource_list = []
-q_list = []
-q_list_time = []
-sex_dic = {}
-usmaps_dic = {}
-
-env = simpy.Environment() #create a simpy environment
-for stn_nm in station_list:
-    resource_list.append(simpy.Resource(env, STATION_DIC[stn_nm]["server_ct"]))
-    q_list.append([])
-    q_list_time.append([])
-
-env.process(generate_cust(env))#, tailor)) #set the initial simulation process
-env.run() #run the simulation
-
-df_time_stamp = pd.DataFrame()
-df_time_stamp['o_time_stamp'] = time_stamp
-df_time_stamp['pn_id'] = [item[0] for item in time_stamp]
-df_time_stamp['stn_no'] = [item[1] for item in time_stamp]
-df_time_stamp['station'] = [item[5] for item in time_stamp]
-df_time_stamp['time_stamp'] = [item[6] for item in time_stamp]
-df_time_stamp['hr'] = df_time_stamp['time_stamp'].astype(int) + SIMULATION_START_TIME
-
-df_time_stamp_sum = (
-    df_time_stamp[["stn_no", "station", "hr"]]
-    .groupby(["stn_no", "station"])
-    .value_counts()
-    .reset_index(name="count")  # <--- This ensures the column is named 'count'
-)
-
-df_time_stamp_wide = df_time_stamp_sum.pivot(index = ["stn_no","station"], columns = "hr", values = "count" ).reset_index()
-
-def plot_queue(idx):
-    plt.scatter(q_list_time[idx],q_list[idx])
-    plt_title = "queue plot: " + station_list[idx] + " (stn " + str(idx) + ")"
-    plt.title(plt_title)
-    plt.xlim(5,20)
-    plt.show()
+    # Create and run simulation
+    sim = RDaySimulation(mod_path=args.mod, usmaps_path=args.usmaps)
+    sim.run()
     
-  
-df_time_stamp = pd.DataFrame(time_stamp, columns = ["entity","stn_idx","q_length",
-                                                    "svc_count","svc_capacity","stn_nm",
-                                                    "time","next_stn","arc_ct","svc_count_after"])
-
-df_fname = os.path.join(OUTPUT_DIR_STR, "df_time_stamp.csv")
-df_time_stamp.to_csv(df_fname, index=False)
-
-# this was originally designed to provide max time that the station finished
-# mothballing...
-#df_time_stamp_max = df_time_stamp.loc[df_time_stamp.groupby('stn_nm')['time'].idxmax()]
-#df_fname = os.path.join(OUTPUT_DIR_STR, "df_time_stamp_max.csv")
-#df_time_stamp_max.to_csv(df_fname, index=False)    
-#print(df_time_stamp_max['time'].loc[df_time_stamp_max['stn_nm'] == 'R-Day complete'].iloc[0])
-
-# 1. Find the index of the row with the maximum 'time' for each 'stn_nm'
-idx_max_time = df_time_stamp.groupby('stn_nm')['time'].idxmax()
-
-# 2. Select those specific rows from the original DataFrame
-df_max_time_per_stn = df_time_stamp.loc[idx_max_time].sort_values(by='stn_idx', ascending=True).reset_index(drop=True)
-
-# 2. Extract the 'time' column
-time_values = df_max_time_per_stn['time']
-
-# 3. Convert the time values to strings and join them with a comma and space
-# Use map(str) to ensure all elements are strings before joining
-time_string = ", ".join(time_values.map(str))
-
-fin_time = round(df_time_stamp['time'].iloc[df_time_stamp.shape[0]-1],2)
-
-fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(15, 12))
-fig.suptitle(mod_path + " " + usmaps_path + " | " + str(fin_time), fontsize = 24)
-for i in range(0,len(station_list)-1):
-    row = i // 4
-    col = i % 4
-    ax[row,col].scatter(q_list_time[i],q_list[i])
-    ax[row,col].set_title(station_list[i])
-
-plt.tight_layout() # Adjust subplots to fit in figure area
-
-# Join the directory and the filename safely
-filename = f"{mod_path}_{usmaps_path}.png"
-plt_fname = os.path.join(OUTPUT_DIR_STR, filename)
-plt.savefig(plt_fname)
-plt.show()
-
-# this is a control file for analysis and plotting
-recent_run_fname = os.path.join(OUTPUT_DIR_STR,"recent_run.txt")
-with open(recent_run_fname, "w") as file:
-    file.write(mod_path + " " + usmaps_path)
+    # Save and plot results
+    sim.save_results()
+    sim.plot_results(show_plots=not args.no_show)
     
+    # Save control file for analysis
+    recent_run_file = os.path.join(sim.output_dir, "recent_run.txt")
+    with open(recent_run_file, "w") as f:
+        f.write(f"{args.mod} {args.usmaps}")
 
+
+if __name__ == "__main__":
+    main()
