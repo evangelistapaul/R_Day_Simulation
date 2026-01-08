@@ -65,9 +65,6 @@ mod_path = args.mod
 print("The usmaps path is: " + usmaps_path)
 print("The mod path is: " + str(mod_path))
 
-#TOTAL_CUSTOMERS = 1250
-#ARRIVAL_RATE = 2000 #customer arrivals per unit of time
-
 time_stamp = []
 arc_dic = {}
 
@@ -85,7 +82,6 @@ def generic_stn(env, i, stn):
                                      loc = s_loc,
                                      scale = s_scale,
                                      size = 1)
-    #enter_time = env.now
     if(usmaps_dic[i] == 1):
         svc_time_rand = svc_time_rand * STATION_DIC[stn]["USMAPS_frac"]
     if(sex_dic[i] == 0 and stn == "CA 2 Barber Shop" ): # female NC barber time = 0
@@ -123,7 +119,6 @@ def generic_stn(env, i, stn):
             batch_oath(env, i)
         else:
             env.process(generic_stn(env, i, station_list[next_stn]))
-            #print("next station is ", station_list[next_stn])
 
 batch_bus_q = []
 def batch_bus(env, i):
@@ -159,7 +154,7 @@ def batch_oath(env, i):
             env.process(generic_stn(env, cdt, station_list[next_stn]))
         batch_oath_q = []
 
-def generate_cust(env):#, tailor):
+def generate_cust(env):
     #generate the customers - this is essentially an arrival generator
     ct = 0
     start_time = 0
@@ -185,10 +180,8 @@ def generate_cust(env):#, tailor):
         if(i % 2 == 0 and fem_ct < FEMALE_COUNT_MAX):
             sex_dic[i] = 0 #female cadet
             fem_ct = fem_ct + 1
-        #print('generating customer %s' % i)
         inter_arr_time = stats.expon.rvs(loc=0,scale=(1/ARRIVAL_RATE),size=1) #location is offset, scale is mean
         yield env.timeout(inter_arr_time)
-        #inter_arr_time = np.array([1/ARRIVAL_RATE]) #static for testing
         env.process(generic_stn(env, i, station_list[0]))
         ct = ct + 1
         if(ct == CUSTOMER_BATCH_SIZE):
@@ -228,7 +221,6 @@ df_time_stamp['station'] = [item[5] for item in time_stamp]
 df_time_stamp['time_stamp'] = [item[6] for item in time_stamp]
 df_time_stamp['hr'] = df_time_stamp['time_stamp'].astype(int) + SIMULATION_START_TIME
 
-#df_time_stamp_sum = pd.DataFrame(df_time_stamp[["stn_no","station","hr"]].groupby(["stn_no","station"]).value_counts()).reset_index()
 df_time_stamp_sum = (
     df_time_stamp[["stn_no", "station", "hr"]]
     .groupby(["stn_no", "station"])
@@ -239,8 +231,6 @@ df_time_stamp_sum = (
 df_time_stamp_wide = df_time_stamp_sum.pivot(index = ["stn_no","station"], columns = "hr", values = "count" ).reset_index()
 
 def plot_queue(idx):
-    #q_x = np.linspace(1,len(q_list[idx]),len(q_list[idx]))
-    #plt.scatter(q_x,q_list[idx])
     plt.scatter(q_list_time[idx],q_list[idx])
     plt_title = "queue plot: " + station_list[idx] + " (stn " + str(idx) + ")"
     plt.title(plt_title)
@@ -274,9 +264,6 @@ time_values = df_max_time_per_stn['time']
 # 3. Convert the time values to strings and join them with a comma and space
 # Use map(str) to ensure all elements are strings before joining
 time_string = ", ".join(time_values.map(str))
-
-# 4. Print the resulting string
-#print(time_string)
 
 fin_time = round(df_time_stamp['time'].iloc[df_time_stamp.shape[0]-1],2)
 
