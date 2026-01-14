@@ -13,6 +13,8 @@ This simulation models the flow of new cadets through various processing station
 
 The simulation supports different scenarios for USMAPS (United States Military Academy Preparatory School) cadets and includes gender-specific routing.
 
+Visit https://paul-evangelista.com/R_day_article.html for a discussion of this project.
+
 ## Project Structure
 
 ```
